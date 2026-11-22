@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#f7f5ef">
+  <meta name="description" content="一起记录下次见面要做的事、要吃的饭和见面的日期。">
+  <title>只有我们俩 · 见面清单</title>
+  <link rel="icon" href="./avatar.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./github.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="shell top-inner">
+      <div class="brand">
+        <img src="./avatar.png" width="36" height="36" alt="">
+        <span>只有我们俩</span>
+      </div>
+      <div class="top-actions">
+        <span id="sync-state" class="sync-state">本机预览</span>
+        <button id="connect-button" class="button small" type="button">连接 GitHub</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell workspace">
+    <div class="section-heading">
+      <h1>见面清单</h1>
+      <button id="refresh-button" class="button small" type="button" hidden>刷新清单</button>
+    </div>
+
+    <section class="date-card" aria-labelledby="date-heading">
+      <div class="date-content">
+        <h2 id="date-heading">下次见面</h2>
+        <p id="date-label" class="date-label">还没定日期</p>
+        <p id="date-hint" class="date-hint" hidden></p>
+        <button id="date-button" class="button date-button" type="button">选择日期</button>
+      </div>
+      <div class="date-decoration" aria-hidden="true"><span></span></div>
+    </section>
+
+    <p id="notice" class="notice" role="status" hidden></p>
+
+    <section class="list-card" aria-label="见面清单条目">
+      <div class="categories" role="group" aria-label="清单分类">
+        <button class="category" type="button" data-category="plans" aria-pressed="true">要做的事 <span id="plans-count">0</span></button>
+        <button class="category" type="button" data-category="meals" aria-pressed="false">要吃的饭 <span id="meals-count">0</span></button>
+      </div>
+
+      <form id="add-form" class="composer">
+        <label for="item-input" class="visually-hidden">清单内容</label>
+        <input id="item-input" type="text" maxlength="80" autocomplete="off" placeholder="比如，一起去逛逛书店" required>
+        <button class="button primary" type="submit">添加</button>
+      </form>
+
+      <div id="list-progress" class="list-progress" hidden>
+        <p id="progress-text"></p>
+        <progress id="progress-bar" aria-label="已完成条目数" value="0" max="1"></progress>
+      </div>
+      <p id="empty-message" class="empty-message">把下次见面想做的事记在这里。</p>
+      <ul id="items" class="items"></ul>
+    </section>
+  </main>
+
+  <dialog id="connection-dialog" aria-labelledby="connection-title">
+    <form id="connection-form" class="dialog-content">
+      <h2 id="connection-title">连接 GitHub</h2>
+      <p>两台设备填写同一个私有数据仓库，每台设备使用仅限该仓库的读写令牌。</p>
+      <label for="repo-input">私有数据仓库</label>
+      <input id="repo-input" type="text" placeholder="用户名/仓库名" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+      <label for="token-input">GitHub 细粒度令牌</label>
+      <input id="token-input" type="password" placeholder="github_pat_…" autocomplete="off" maxlength="300" required>
+      <label class="remember"><input id="remember-input" type="checkbox">在自己的设备上记住连接</label>
+      <p id="connection-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="disconnect-button" class="button text-button danger" type="button" hidden>断开连接</button>
+        <button class="button" type="button" data-close="connection-dialog">取消</button>
+        <button id="connect-submit" class="button primary" type="submit">连接</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form id="edit-form" class="dialog-content">
+      <h2 id="edit-title">编辑条目</h2>
+      <label for="edit-input" class="visually-hidden">条目内容</label>
+      <input id="edit-input" type="text" maxlength="80" required>
+      <p id="edit-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button class="button" type="button" data-close="edit-dialog">取消</button>
+        <button class="button primary" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="date-dialog" aria-labelledby="date-dialog-title">
+    <form id="date-form" class="dialog-content">
+      <h2 id="date-dialog-title">下次见面</h2>
+      <label for="date-input" class="visually-hidden">见面日期</label>
+      <input id="date-input" type="date" min="1900-01-01" max="2100-12-31" required>
+      <p id="date-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="clear-date" class="button text-button danger" type="button" hidden>清除日期</button>
+        <button class="button" type="button" data-close="date-dialog">取消</button>
+        <button class="button primary" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <form id="delete-form" class="dialog-content">
+      <h2 id="delete-title">删除这条内容？</h2>
+      <p id="delete-text" class="delete-text"></p>
+      <p id="delete-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button class="button" type="button" data-close="delete-dialog">取消</button>
+        <button class="button primary" type="submit">删除</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
