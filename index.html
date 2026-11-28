@@ -9,7 +9,7 @@
   <meta name="description" content="一起记录下次见面要做的事、要吃的饭和见面的日期。">
   <title>只有我们俩 · 见面清单</title>
   <link rel="icon" href="./avatar.png">
-  <link rel="stylesheet" href="./styles.css?v=meal-move1">
+  <link rel="stylesheet" href="./styles.css?v=inline-home1">
   <script src="./github.js?v=meal-move1" defer></script>
   <script src="./app.js?v=meal-move1" defer></script>
 </head>
@@ -56,9 +56,11 @@
         <button class="button primary" type="submit">添加</button>
       </form>
       <form class="composer" data-composer="meals" hidden>
-        <input type="text" maxlength="80" autocomplete="off" aria-label="要吃的饭的新条目" placeholder="比如，去吃那家火锅" required>
+        <div class="meal-field">
+          <input type="text" maxlength="80" autocomplete="off" aria-label="要吃的饭的新条目" placeholder="比如，去吃那家火锅" required>
+          <label class="home-option"><input type="checkbox" id="add-to-home" aria-label="加到「自己做」">自己做</label>
+        </div>
         <button class="button primary" type="submit">添加</button>
-        <label class="home-option"><input type="checkbox" id="add-to-home">加到「自己做」</label>
       </form>
 
       <div id="list-groups">
