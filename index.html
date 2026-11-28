@@ -9,9 +9,9 @@
   <meta name="description" content="一起记录下次见面要做的事、要吃的饭和见面的日期。">
   <title>只有我们俩 · 见面清单</title>
   <link rel="icon" href="./avatar.png">
-  <link rel="stylesheet" href="./styles.css?v=sort1">
+  <link rel="stylesheet" href="./styles.css?v=groups1">
   <script src="./github.js?v=sort1" defer></script>
-  <script src="./app.js?v=sort1" defer></script>
+  <script src="./app.js?v=groups1" defer></script>
 </head>
 <body>
   <header class="top">
@@ -51,22 +51,27 @@
         <button class="category" type="button" data-category="meals" aria-pressed="false">要吃的饭 <span id="meals-count">0</span></button>
       </div>
 
-      <div id="meal-types" class="meal-types" role="group" aria-label="用餐方式" hidden>
-        <button class="category" type="button" data-meal="meals" aria-pressed="true">出去吃</button>
-        <button class="category" type="button" data-meal="home" aria-pressed="false">自己做</button>
+      <div id="list-groups">
+        <div data-group="plans"></div>
+        <section data-group="meals" aria-labelledby="out-heading" hidden>
+          <h2 id="out-heading">出去吃</h2>
+        </section>
+        <section data-group="home" aria-labelledby="home-heading" hidden>
+          <h2 id="home-heading">自己吃</h2>
+        </section>
       </div>
-      <form id="add-form" class="composer">
-        <label for="item-input" class="visually-hidden">清单内容</label>
-        <input id="item-input" type="text" maxlength="80" autocomplete="off" placeholder="比如，一起去逛逛书店" required>
-        <button class="button primary" type="submit">添加</button>
-      </form>
-
-      <div id="list-progress" class="list-progress" hidden>
-        <p id="progress-text"></p>
-        <progress id="progress-bar" aria-label="已完成条目数" value="0" max="1"></progress>
-      </div>
-      <p id="empty-message" class="empty-message">把下次见面想做的事记在这里。</p>
-      <ul id="items" class="items"></ul>
+      <template id="group-content">
+        <form class="composer">
+          <input type="text" maxlength="80" autocomplete="off" required>
+          <button class="button primary" type="submit">添加</button>
+        </form>
+        <div class="list-progress" hidden>
+          <p></p>
+          <progress aria-label="已完成条目数" value="0" max="1"></progress>
+        </div>
+        <p class="empty-message"></p>
+        <ul class="items"></ul>
+      </template>
     </section>
   </main>
 
@@ -96,7 +101,7 @@
       <label id="edit-meal-label" for="edit-meal" hidden>用餐方式</label>
       <select id="edit-meal" hidden>
         <option value="meals">出去吃</option>
-        <option value="home">自己做</option>
+        <option value="home">自己吃</option>
       </select>
       <p id="edit-error" class="form-error" role="alert" hidden></p>
       <div class="dialog-actions">

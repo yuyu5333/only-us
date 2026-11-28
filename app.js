@@ -9,29 +9,33 @@
   const copy = {
     plans: { placeholder: '比如，一起去逛逛书店', empty: '把下次见面想做的事记在这里。' },
     meals: { placeholder: '比如，去吃那家火锅', empty: '记下想一起去吃的店。' },
-    home: { placeholder: '比如，一起包饺子', empty: '记下想一起做的菜。' },
+    home: { placeholder: '比如，一碗番茄鸡蛋面', empty: '记下自己想吃的饭。' },
   }
 
-  const itemInput = byId('item-input')
+  const groupContainer = byId('list-groups')
+  const groups = [...groupContainer.querySelectorAll('[data-group]')].map(panel => {
+    const kind = panel.dataset.group
+    panel.append(byId('group-content').content.cloneNode(true))
+    const form = panel.querySelector('.composer')
+    const input = form.querySelector('input')
+    input.placeholder = copy[kind].placeholder
+    input.setAttribute('aria-label', (panel.querySelector('h2')?.textContent || '要做的事') + '的新条目')
+    return { kind, panel, form, input, items: panel.querySelector('.items'), draft: null }
+  })
   const notice = byId('notice')
   const connections = byId('connection-dialog')
   const refreshButton = byId('refresh-button')
   const categoryButtons = [...document.querySelectorAll('[data-category]')]
   let list = getPreview()
   let category = 'plans'
-  let mealType = 'meals'
-  const mealButtons = [...document.querySelectorAll('[data-meal]')]
-  const activeCategory = () => category === 'meals' ? mealType : category
   let client = null
   let profile = null
   let busy = false
   let refreshing = false
   let generation = 0
-  let addDraft = null
   let editItem = null
   let deleteItem = null
   let originalDate = ''
-  const itemList = byId('items')
   let drag = null
 
   function getPreview() {
@@ -119,27 +123,26 @@
 
   function renderItems() {
     clearDrag()
-    const current = activeCategory()
-    const items = list.items.filter(item => item.category === current)
-    const completed = items.filter(item => item.done).length
     byId('plans-count').textContent = list.items.filter(item => item.category === 'plans').length
     byId('meals-count').textContent = list.items.filter(item => item.category !== 'plans').length
-    byId('meal-types').hidden = category !== 'meals'
-    for (const button of mealButtons) {
-      button.setAttribute('aria-pressed', String(button.dataset.meal === mealType))
-    }
     for (const button of categoryButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.category === category))
     }
-    itemInput.placeholder = copy[current].placeholder
-
-    byId('list-progress').hidden = !items.length
-    byId('progress-text').textContent = '已完成 ' + completed + ' / ' + items.length
-    const progress = byId('progress-bar')
-    progress.max = items.length || 1
-    progress.value = completed
-    message(byId('empty-message'), items.length ? '' : copy[current].empty)
-    itemList.replaceChildren(...items.map(item => makeItem(item, items.length > 1)))
+    for (const group of groups) {
+      const { kind, panel } = group
+      panel.hidden = (kind === 'plans' ? 'plans' : 'meals') !== category
+      if (panel.hidden) continue
+      const items = list.items.filter(item => item.category === kind)
+      const completed = items.filter(item => item.done).length
+      const progress = panel.querySelector('.list-progress')
+      progress.hidden = !items.length
+      progress.querySelector('p').textContent = '已完成 ' + completed + ' / ' + items.length
+      const bar = progress.querySelector('progress')
+      bar.max = items.length || 1
+      bar.value = completed
+      message(panel.querySelector('.empty-message'), items.length ? '' : copy[kind].empty)
+      group.items.replaceChildren(...items.map(item => makeItem(item, items.length > 1)))
+    }
   }
 
   function makeItem(item, sortable) {
@@ -181,7 +184,7 @@
 
   function clearDrag() {
     if (!drag) return
-    const { row, pointerId, frame } = drag
+    const { row, itemList, pointerId, frame } = drag
     drag = null
     cancelAnimationFrame(frame)
     row.classList.remove('dragging')
@@ -191,7 +194,7 @@
   }
 
   function positionDraggedRow() {
-    const { row, y, grabOffset } = drag
+    const { row, itemList, y, grabOffset } = drag
     const before = [...itemList.children].find(other => {
       if (other === row) return false
       const rect = other.getBoundingClientRect()
@@ -216,34 +219,36 @@
     drag.frame = requestAnimationFrame(scrollWhileDragging)
   }
 
-  itemList.addEventListener('pointerdown', event => {
+  groupContainer.addEventListener('pointerdown', event => {
     const handle = event.target.closest('.sort-handle')
     if (!handle || busy || drag || !event.isPrimary || event.button !== 0) return
     const row = handle.closest('.item')
-    drag = { row, pointerId: event.pointerId, startY: event.clientY, y: event.clientY,
+    const itemList = row.parentElement
+    drag = { row, itemList, pointerId: event.pointerId, startY: event.clientY, y: event.clientY,
       grabOffset: event.clientY - row.getBoundingClientRect().top,
       originalNext: row.nextElementSibling, moving: false, frame: 0 }
     itemList.setPointerCapture(event.pointerId)
   })
 
-  itemList.addEventListener('pointermove', event => {
+  groupContainer.addEventListener('pointermove', event => {
     if (drag?.pointerId !== event.pointerId) return
     drag.y = event.clientY
     if (!drag.moving && Math.abs(drag.y - drag.startY) < 4) return
     drag.moving = true
     drag.row.classList.add('dragging')
-    itemList.classList.add('sorting')
+    drag.itemList.classList.add('sorting')
     positionDraggedRow()
     if (!drag.frame) drag.frame = requestAnimationFrame(scrollWhileDragging)
   })
 
   async function savePosition(row, before) {
     const id = row.dataset.id
-    const saved = await save({ type: 'move', category: activeCategory(), id, before: before?.dataset.id ?? null })
+    const category = row.closest('[data-group]').dataset.group
+    const saved = await save({ type: 'move', category, id, before: before?.dataset.id ?? null })
     if (!saved) renderItems()
   }
 
-  itemList.addEventListener('pointerup', event => {
+  groupContainer.addEventListener('pointerup', event => {
     if (drag?.pointerId !== event.pointerId) return
     const { row, originalNext, moving } = drag
     if (moving) {
@@ -258,7 +263,7 @@
     if (drag) renderItems()
   }
   for (const type of ['pointercancel', 'lostpointercapture']) {
-    itemList.addEventListener(type, event => {
+    groupContainer.addEventListener(type, event => {
       if (drag?.pointerId === event.pointerId) cancelDrag()
     })
   }
@@ -266,7 +271,7 @@
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') cancelDrag()
   })
-  itemList.addEventListener('keydown', async event => {
+  groupContainer.addEventListener('keydown', async event => {
     if (!event.target.matches('.sort-handle') || busy || drag) return
     const row = event.target.closest('.item')
     const up = event.key === 'ArrowUp'
@@ -274,6 +279,7 @@
     event.preventDefault()
     const neighbor = up ? row.previousElementSibling : row.nextElementSibling
     if (!neighbor) return
+    const itemList = row.parentElement
     await savePosition(row, up ? neighbor : neighbor.nextElementSibling)
     itemList.querySelector('[data-id="' + row.dataset.id + '"] .sort-handle')?.focus()
   })
@@ -291,12 +297,14 @@
   function updateControls() {
     for (const element of document.querySelectorAll(
       '.composer input, .item input, .item button, .dialog-content input, ' +
-      '.dialog-actions button, #connect-button, #date-button, [data-category], [data-meal], #edit-meal'
+      '.dialog-actions button, #connect-button, #date-button, [data-category], #edit-meal'
     )) {
       element.disabled = busy
     }
     refreshButton.disabled = busy || refreshing
-    byId('add-form').querySelector('button').disabled = busy || !itemInput.value.trim()
+    for (const { form, input } of groups) {
+      form.querySelector('button').disabled = busy || !input.value.trim()
+    }
   }
 
   async function refresh(quiet = false) {
@@ -361,8 +369,7 @@
       client = nextClient
       list = nextList
       profile = { repository: details.repository, remember: details.remember }
-      addDraft = null
-      itemInput.value = ''
+      resetDrafts()
       if (connections.open) connections.close()
       const stored = rememberConnection(details)
       message(notice, stored ? '' : '已连接。浏览器限制了令牌保存，本次打开期间仍可使用。')
@@ -405,28 +412,31 @@
     })
   }
 
-  itemInput.addEventListener('input', updateControls)
-  for (const button of mealButtons) {
-    button.addEventListener('click', () => {
-      mealType = button.dataset.meal
-      renderItems()
+  function resetDrafts() {
+    for (const group of groups) {
+      group.draft = null
+      group.input.value = ''
+    }
+  }
+
+  for (const group of groups) {
+    const { form, input, kind } = group
+    input.addEventListener('input', updateControls)
+    form.addEventListener('submit', async event => {
+      event.preventDefault()
+      const text = input.value.trim()
+      if (!text || busy) return
+      if (group.draft?.text !== text) {
+        group.draft = { type: 'add', id: newItemId(), category: kind, text }
+      }
+      if (await save(group.draft)) {
+        group.draft = null
+        input.value = ''
+        updateControls()
+        input.focus()
+      }
     })
   }
-  byId('add-form').addEventListener('submit', async event => {
-    event.preventDefault()
-    const text = itemInput.value.trim()
-    if (!text || busy) return
-    const current = activeCategory()
-    if (!addDraft || addDraft.text !== text || addDraft.category !== current) {
-      addDraft = { type: 'add', id: newItemId(), category: current, text }
-    }
-    if (await save(addDraft)) {
-      addDraft = null
-      itemInput.value = ''
-      updateControls()
-      itemInput.focus()
-    }
-  })
 
   byId('edit-form').addEventListener('submit', async event => {
     event.preventDefault()
@@ -484,8 +494,7 @@
     forgetConnection()
     client = null
     profile = null
-    addDraft = null
-    itemInput.value = ''
+    resetDrafts()
     list = getPreview()
     connections.close()
     message(notice)

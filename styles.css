@@ -169,9 +169,11 @@ h1 { font-size: clamp(1.9rem, 5vw, 2.65rem); line-height: 1.2; letter-spacing: -
   box-shadow: 0 1px 3px #3331;
 }
 .category span { font-size: .875rem; font-variant-numeric: tabular-nums; color: var(--muted); }
-.meal-types { display: flex; gap: .5rem; margin-top: .8rem; }
-.meal-types .category { flex: 1; min-height: 2.6rem; border-color: var(--line); }
-.meal-types .category[aria-pressed="true"] { background: var(--ink); color: white; }
+#list-groups section { padding-top: 1.1rem; }
+#list-groups section + section { border-top: 1px solid var(--line); margin-top: 1rem; }
+#list-groups h2 { margin: 0; color: var(--green); font-size: 1.08rem; }
+#list-groups h2 + .composer { margin-top: .55rem; }
+#list-groups section .empty-message { padding-block: 1rem .4rem; }
 #edit-meal { padding: .6rem; border: 1px solid var(--line); border-radius: .65rem; font: inherit; }
 
 .composer { display: flex; gap: .65rem; margin-top: .95rem; }
