@@ -9,7 +9,7 @@
   const copy = {
     plans: { placeholder: '比如，一起去逛逛书店', empty: '把下次见面想做的事记在这里。' },
     meals: { placeholder: '比如，去吃那家火锅', empty: '记下想一起去吃的店。' },
-    home: { placeholder: '比如，一碗番茄鸡蛋面', empty: '记下自己想吃的饭。' },
+    home: { placeholder: '比如，一起做番茄鸡蛋面', empty: '记下想一起做的菜。' },
   }
 
   const groupContainer = byId('list-groups')
