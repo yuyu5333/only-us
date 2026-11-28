@@ -2,7 +2,7 @@
   'use strict'
 
   const FILE = 'meeting-list.json'
-  const CATEGORIES = ['plans', 'meals']
+  const CATEGORIES = ['plans', 'meals', 'home']
   const MAX_ITEMS = 200
   const API_ROOT = 'https://api.github.com/repos'
 
@@ -78,7 +78,14 @@
         items: list.items.map(item => item.id === change.id ? { ...item, done: change.done } : item),
       }
     }
-    if (change.type === 'edit' && existing.text === change.text) return list
+    const category = change.category ?? existing.category
+    if (change.type === 'edit') {
+      if (!CATEGORIES.includes(category)) throw new Error('请选择清单分类。')
+      if (existing.text === change.text && existing.category === category) return list
+      if (change.previousCategory && existing.category !== change.previousCategory) {
+        throw new Error('这条内容的分类已修改，请刷新清单后重新操作。')
+      }
+    }
     if (existing.text !== change.previous) {
       throw new Error('这条内容已被修改，请刷新清单后重新操作。')
     }
@@ -88,7 +95,7 @@
     if (change.type === 'edit' && validText(change.text)) {
       return {
         ...list,
-        items: list.items.map(item => item.id === change.id ? { ...item, text: change.text } : item),
+        items: list.items.map(item => item.id === change.id ? { ...item, text: change.text, category } : item),
       }
     }
     throw new Error('请输入 1 到 80 字。')

@@ -8,7 +8,8 @@
   const connectionKey = 'only-us:connection:' + route
   const copy = {
     plans: { placeholder: '比如，一起去逛逛书店', empty: '把下次见面想做的事记在这里。' },
-    meals: { placeholder: '比如，去吃那家火锅', empty: '把想一起吃的饭和想去的店记在这里。' },
+    meals: { placeholder: '比如，去吃那家火锅', empty: '记下想一起去吃的店。' },
+    home: { placeholder: '比如，一起包饺子', empty: '记下想一起做的菜。' },
   }
 
   const itemInput = byId('item-input')
@@ -18,6 +19,9 @@
   const categoryButtons = [...document.querySelectorAll('[data-category]')]
   let list = getPreview()
   let category = 'plans'
+  let mealType = 'meals'
+  const mealButtons = [...document.querySelectorAll('[data-meal]')]
+  const activeCategory = () => category === 'meals' ? mealType : category
   let client = null
   let profile = null
   let busy = false
@@ -112,21 +116,26 @@
   }
 
   function renderItems() {
-    const items = list.items.filter(item => item.category === category)
+    const current = activeCategory()
+    const items = list.items.filter(item => item.category === current)
     const completed = items.filter(item => item.done).length
     byId('plans-count').textContent = list.items.filter(item => item.category === 'plans').length
-    byId('meals-count').textContent = list.items.filter(item => item.category === 'meals').length
+    byId('meals-count').textContent = list.items.filter(item => item.category !== 'plans').length
+    byId('meal-types').hidden = category !== 'meals'
+    for (const button of mealButtons) {
+      button.setAttribute('aria-pressed', String(button.dataset.meal === mealType))
+    }
     for (const button of categoryButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.category === category))
     }
-    itemInput.placeholder = copy[category].placeholder
+    itemInput.placeholder = copy[current].placeholder
 
     byId('list-progress').hidden = !items.length
     byId('progress-text').textContent = '已完成 ' + completed + ' / ' + items.length
     const progress = byId('progress-bar')
     progress.max = items.length || 1
     progress.value = completed
-    message(byId('empty-message'), items.length ? '' : copy[category].empty)
+    message(byId('empty-message'), items.length ? '' : copy[current].empty)
     byId('items').replaceChildren(...items.map(makeItem))
   }
 
@@ -170,7 +179,7 @@
   function updateControls() {
     for (const element of document.querySelectorAll(
       '.composer input, .item input, .item button, .dialog-content input, ' +
-      '.dialog-actions button, #connect-button, #date-button, [data-category]'
+      '.dialog-actions button, #connect-button, #date-button, [data-category], [data-meal], #edit-meal'
     )) {
       element.disabled = busy
     }
@@ -263,6 +272,8 @@
   function openEdit(item) {
     editItem = item
     byId('edit-input').value = item.text
+    byId('edit-meal-label').hidden = byId('edit-meal').hidden = item.category === 'plans'
+    byId('edit-meal').value = item.category
     message(byId('edit-error'))
     byId('edit-dialog').showModal()
   }
@@ -283,12 +294,19 @@
   }
 
   itemInput.addEventListener('input', updateControls)
+  for (const button of mealButtons) {
+    button.addEventListener('click', () => {
+      mealType = button.dataset.meal
+      renderItems()
+    })
+  }
   byId('add-form').addEventListener('submit', async event => {
     event.preventDefault()
     const text = itemInput.value.trim()
     if (!text || busy) return
-    if (!addDraft || addDraft.text !== text || addDraft.category !== category) {
-      addDraft = { type: 'add', id: newItemId(), category, text }
+    const current = activeCategory()
+    if (!addDraft || addDraft.text !== text || addDraft.category !== current) {
+      addDraft = { type: 'add', id: newItemId(), category: current, text }
     }
     if (await save(addDraft)) {
       addDraft = null
@@ -302,6 +320,8 @@
     event.preventDefault()
     const change = {
       type: 'edit', id: editItem.id, previous: editItem.text, text: byId('edit-input').value.trim(),
+      previousCategory: editItem.category,
+      category: editItem.category === 'plans' ? 'plans' : byId('edit-meal').value,
     }
     if (await save(change, byId('edit-error'))) byId('edit-dialog').close()
   })

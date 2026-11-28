@@ -51,6 +51,10 @@
         <button class="category" type="button" data-category="meals" aria-pressed="false">要吃的饭 <span id="meals-count">0</span></button>
       </div>
 
+      <div id="meal-types" class="meal-types" role="group" aria-label="用餐方式" hidden>
+        <button class="category" type="button" data-meal="meals" aria-pressed="true">出去吃</button>
+        <button class="category" type="button" data-meal="home" aria-pressed="false">自己做</button>
+      </div>
       <form id="add-form" class="composer">
         <label for="item-input" class="visually-hidden">清单内容</label>
         <input id="item-input" type="text" maxlength="80" autocomplete="off" placeholder="比如，一起去逛逛书店" required>
@@ -89,6 +93,11 @@
       <h2 id="edit-title">编辑条目</h2>
       <label for="edit-input" class="visually-hidden">条目内容</label>
       <input id="edit-input" type="text" maxlength="80" required>
+      <label id="edit-meal-label" for="edit-meal" hidden>用餐方式</label>
+      <select id="edit-meal" hidden>
+        <option value="meals">出去吃</option>
+        <option value="home">自己做</option>
+      </select>
       <p id="edit-error" class="form-error" role="alert" hidden></p>
       <div class="dialog-actions">
         <button class="button" type="button" data-close="edit-dialog">取消</button>
