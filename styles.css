@@ -198,7 +198,32 @@ input[type="text"], input[type="password"], input[type="date"] {
   font-size: .875rem;
 }
 progress { width: min(26%, 7rem); height: .4rem; accent-color: #4b735e; }
-.items { padding: 0; margin: .65rem 0 0; list-style: none; }
+.items { position: relative; padding: 0; margin: .65rem 0 0; list-style: none; }
+.items.sorting { overflow-anchor: none; user-select: none; cursor: grabbing; }
+.item:not(:only-child) { grid-template-columns: auto minmax(0, 1fr) auto; }
+.sort-handle {
+  width: 2.5rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: .5rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.35rem;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.sort-handle:hover { background: var(--wash); }
+.item.dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 0 3px 12px #243b3029;
+  border-radius: .55rem;
+}
+.dragging .sort-handle { cursor: grabbing; }
 .items:empty { margin-top: 0; }
 .empty-message { padding: 1.9rem .4rem 1.25rem; color: var(--muted); text-align: center; }
 .item {

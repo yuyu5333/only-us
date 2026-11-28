@@ -31,6 +31,8 @@
   let editItem = null
   let deleteItem = null
   let originalDate = ''
+  const itemList = byId('items')
+  let drag = null
 
   function getPreview() {
     try {
@@ -116,6 +118,7 @@
   }
 
   function renderItems() {
+    clearDrag()
     const current = activeCategory()
     const items = list.items.filter(item => item.category === current)
     const completed = items.filter(item => item.done).length
@@ -136,13 +139,14 @@
     progress.max = items.length || 1
     progress.value = completed
     message(byId('empty-message'), items.length ? '' : copy[current].empty)
-    byId('items').replaceChildren(...items.map(makeItem))
+    itemList.replaceChildren(...items.map(item => makeItem(item, items.length > 1)))
   }
 
-  function makeItem(item) {
+  function makeItem(item, sortable) {
     const row = document.createElement('li')
     row.className = 'item'
     row.dataset.done = String(item.done)
+    row.dataset.id = item.id
     const label = document.createElement('label')
     const checkbox = document.createElement('input')
     checkbox.type = 'checkbox'
@@ -163,8 +167,116 @@
     remove.classList.add('danger')
     actions.append(edit, remove)
     row.append(label, actions)
+    if (sortable) {
+      const handle = document.createElement('button')
+      handle.type = 'button'
+      handle.className = 'sort-handle'
+      handle.textContent = '⠿'
+      handle.title = '拖动排序，也可用上下方向键移动'
+      handle.setAttribute('aria-label', '调整「' + item.text + '」的顺序，使用上下方向键移动')
+      row.prepend(handle)
+    }
     return row
   }
+
+  function clearDrag() {
+    if (!drag) return
+    const { row, pointerId, frame } = drag
+    drag = null
+    cancelAnimationFrame(frame)
+    row.classList.remove('dragging')
+    row.style.removeProperty('transform')
+    itemList.classList.remove('sorting')
+    if (itemList.hasPointerCapture(pointerId)) itemList.releasePointerCapture(pointerId)
+  }
+
+  function positionDraggedRow() {
+    const { row, y, grabOffset } = drag
+    const before = [...itemList.children].find(other => {
+      if (other === row) return false
+      const rect = other.getBoundingClientRect()
+      return y < rect.top + rect.height / 2
+    }) || null
+    if (row.nextElementSibling !== before) itemList.insertBefore(row, before)
+    const top = Math.max(0, Math.min(itemList.clientHeight - row.offsetHeight,
+      y - itemList.getBoundingClientRect().top - grabOffset))
+    row.style.transform = 'translateY(' + (top - row.offsetTop) + 'px)'
+  }
+
+  function scrollWhileDragging() {
+    drag.frame = 0
+    const edge = 56
+    const y = drag.y
+    const speed = y < edge ? y - edge : Math.max(0, y - (innerHeight - edge))
+    if (!speed) return
+    const previous = window.scrollY
+    window.scrollBy(0, Math.sign(speed) * Math.min(18, Math.ceil(Math.abs(speed) / 3)))
+    if (window.scrollY === previous) return
+    positionDraggedRow()
+    drag.frame = requestAnimationFrame(scrollWhileDragging)
+  }
+
+  itemList.addEventListener('pointerdown', event => {
+    const handle = event.target.closest('.sort-handle')
+    if (!handle || busy || drag || !event.isPrimary || event.button !== 0) return
+    const row = handle.closest('.item')
+    drag = { row, pointerId: event.pointerId, startY: event.clientY, y: event.clientY,
+      grabOffset: event.clientY - row.getBoundingClientRect().top,
+      originalNext: row.nextElementSibling, moving: false, frame: 0 }
+    itemList.setPointerCapture(event.pointerId)
+  })
+
+  itemList.addEventListener('pointermove', event => {
+    if (drag?.pointerId !== event.pointerId) return
+    drag.y = event.clientY
+    if (!drag.moving && Math.abs(drag.y - drag.startY) < 4) return
+    drag.moving = true
+    drag.row.classList.add('dragging')
+    itemList.classList.add('sorting')
+    positionDraggedRow()
+    if (!drag.frame) drag.frame = requestAnimationFrame(scrollWhileDragging)
+  })
+
+  async function savePosition(row, before) {
+    const id = row.dataset.id
+    const saved = await save({ type: 'move', category: activeCategory(), id, before: before?.dataset.id ?? null })
+    if (!saved) renderItems()
+  }
+
+  itemList.addEventListener('pointerup', event => {
+    if (drag?.pointerId !== event.pointerId) return
+    const { row, originalNext, moving } = drag
+    if (moving) {
+      drag.y = event.clientY
+      positionDraggedRow()
+    }
+    clearDrag()
+    if (moving && row.nextElementSibling !== originalNext) savePosition(row, row.nextElementSibling)
+  })
+
+  function cancelDrag() {
+    if (drag) renderItems()
+  }
+  for (const type of ['pointercancel', 'lostpointercapture']) {
+    itemList.addEventListener(type, event => {
+      if (drag?.pointerId === event.pointerId) cancelDrag()
+    })
+  }
+  window.addEventListener('blur', cancelDrag)
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') cancelDrag()
+  })
+  itemList.addEventListener('keydown', async event => {
+    if (!event.target.matches('.sort-handle') || busy || drag) return
+    const row = event.target.closest('.item')
+    const up = event.key === 'ArrowUp'
+    if (!up && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    const neighbor = up ? row.previousElementSibling : row.nextElementSibling
+    if (!neighbor) return
+    await savePosition(row, up ? neighbor : neighbor.nextElementSibling)
+    itemList.querySelector('[data-id="' + row.dataset.id + '"] .sort-handle')?.focus()
+  })
 
   function itemButton(title, item, action) {
     const button = document.createElement('button')
@@ -188,13 +300,13 @@
   }
 
   async function refresh(quiet = false) {
-    if (!client || busy || refreshing) return
+    if (!client || busy || refreshing || drag) return
     refreshing = true
     updateControls()
     const marker = generation
     try {
       const next = await client.load()
-      if (marker !== generation) return
+      if (marker !== generation || drag) return
       if (JSON.stringify(next) !== JSON.stringify(list)) {
         list = next
         render()

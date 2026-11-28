@@ -71,6 +71,18 @@
       throw new Error('这条内容已删除，请刷新清单。')
     }
 
+    if (change.type === 'move') {
+      const group = list.items.filter(item => item.category === change.category)
+      const from = group.indexOf(existing)
+      const before = change.before === null ? group.length : group.findIndex(item => item.id === change.before)
+      if (from < 0 || before < 0) throw new Error('条目的位置已变动，请刷新后再拖动。')
+      if (before === from || before === from + 1) return list
+      group.splice(from, 1)
+      group.splice(before > from ? before - 1 : before, 0, existing)
+      let index = 0
+      return { ...list, items: list.items.map(item => item.category === change.category ? group[index++] : item) }
+    }
+
     if (change.type === 'toggle') {
       if (existing.done === change.done) return list
       return {
