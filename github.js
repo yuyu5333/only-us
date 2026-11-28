@@ -75,7 +75,17 @@
       const group = list.items.filter(item => item.category === change.category)
       const from = group.indexOf(existing)
       const before = change.before === null ? group.length : group.findIndex(item => item.id === change.before)
-      if (from < 0 || before < 0) throw new Error('条目的位置已变动，请刷新后再拖动。')
+      if (before < 0) throw new Error('目标条目已变动，请刷新后再拖动。')
+      if (from < 0) {
+        if (existing.category !== change.previousCategory ||
+            !['meals', 'home'].includes(existing.category) || !['meals', 'home'].includes(change.category)) {
+          throw new Error('条目的分组已变动，请刷新后再拖动。')
+        }
+        const items = list.items.filter(item => item !== existing)
+        const insertion = change.before === null ? items.length : items.indexOf(group[before])
+        items.splice(insertion, 0, { ...existing, category: change.category })
+        return { ...list, items }
+      }
       if (before === from || before === from + 1) return list
       group.splice(from, 1)
       group.splice(before > from ? before - 1 : before, 0, existing)

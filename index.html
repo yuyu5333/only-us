@@ -9,9 +9,9 @@
   <meta name="description" content="一起记录下次见面要做的事、要吃的饭和见面的日期。">
   <title>只有我们俩 · 见面清单</title>
   <link rel="icon" href="./avatar.png">
-  <link rel="stylesheet" href="./styles.css?v=groups1">
-  <script src="./github.js?v=sort1" defer></script>
-  <script src="./app.js?v=groups2" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=meal-move1">
+  <script src="./github.js?v=meal-move1" defer></script>
+  <script src="./app.js?v=meal-move1" defer></script>
 </head>
 <body>
   <header class="top">
@@ -51,6 +51,16 @@
         <button class="category" type="button" data-category="meals" aria-pressed="false">要吃的饭 <span id="meals-count">0</span></button>
       </div>
 
+      <form class="composer" data-composer="plans">
+        <input type="text" maxlength="80" autocomplete="off" aria-label="要做的事的新条目" placeholder="比如，一起去逛逛书店" required>
+        <button class="button primary" type="submit">添加</button>
+      </form>
+      <form class="composer" data-composer="meals" hidden>
+        <input type="text" maxlength="80" autocomplete="off" aria-label="要吃的饭的新条目" placeholder="比如，去吃那家火锅" required>
+        <button class="button primary" type="submit">添加</button>
+        <label class="home-option"><input type="checkbox" id="add-to-home">加到「自己做」</label>
+      </form>
+
       <div id="list-groups">
         <div data-group="plans"></div>
         <section data-group="meals" aria-labelledby="out-heading" hidden>
@@ -61,10 +71,6 @@
         </section>
       </div>
       <template id="group-content">
-        <form class="composer">
-          <input type="text" maxlength="80" autocomplete="off" required>
-          <button class="button primary" type="submit">添加</button>
-        </form>
         <div class="list-progress" hidden>
           <p></p>
           <progress aria-label="已完成条目数" value="0" max="1"></progress>

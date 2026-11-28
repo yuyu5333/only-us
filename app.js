@@ -7,7 +7,7 @@
   const previewKey = 'only-us:preview:' + route
   const connectionKey = 'only-us:connection:' + route
   const copy = {
-    plans: { placeholder: '比如，一起去逛逛书店', empty: '把下次见面想做的事记在这里。' },
+    plans: { empty: '把下次见面想做的事记在这里。' },
     meals: { placeholder: '比如，去吃那家火锅', empty: '记下想一起去吃的店。' },
     home: { placeholder: '比如，一起做番茄鸡蛋面', empty: '记下想一起做的菜。' },
   }
@@ -16,12 +16,12 @@
   const groups = [...groupContainer.querySelectorAll('[data-group]')].map(panel => {
     const kind = panel.dataset.group
     panel.append(byId('group-content').content.cloneNode(true))
-    const form = panel.querySelector('.composer')
-    const input = form.querySelector('input')
-    input.placeholder = copy[kind].placeholder
-    input.setAttribute('aria-label', (panel.querySelector('h2')?.textContent || '要做的事') + '的新条目')
-    return { kind, panel, form, input, items: panel.querySelector('.items'), draft: null }
+    return { kind, panel, items: panel.querySelector('.items') }
   })
+  const composers = [...document.querySelectorAll('[data-composer]')].map(form => ({
+    kind: form.dataset.composer, form, input: form.querySelector('input[type="text"]'), draft: null,
+  }))
+  const homeOption = byId('add-to-home')
   const notice = byId('notice')
   const connections = byId('connection-dialog')
   const refreshButton = byId('refresh-button')
@@ -123,6 +123,7 @@
 
   function renderItems() {
     clearDrag()
+    for (const { kind, form } of composers) form.hidden = kind !== category
     byId('plans-count').textContent = list.items.filter(item => item.category === 'plans').length
     byId('meals-count').textContent = list.items.filter(item => item.category !== 'plans').length
     for (const button of categoryButtons) {
@@ -141,7 +142,7 @@
       bar.max = items.length || 1
       bar.value = completed
       message(panel.querySelector('.empty-message'), items.length ? '' : copy[kind].empty)
-      group.items.replaceChildren(...items.map(item => makeItem(item, items.length > 1)))
+      group.items.replaceChildren(...items.map(item => makeItem(item, kind !== 'plans' || items.length > 1)))
     }
   }
 
@@ -171,6 +172,7 @@
     actions.append(edit, remove)
     row.append(label, actions)
     if (sortable) {
+      row.classList.add('sortable')
       const handle = document.createElement('button')
       handle.type = 'button'
       handle.className = 'sort-handle'
@@ -185,6 +187,7 @@
   function clearDrag() {
     if (!drag) return
     const { row, itemList, pointerId, frame } = drag
+    clearDropTarget()
     drag = null
     cancelAnimationFrame(frame)
     row.classList.remove('dragging')
@@ -193,17 +196,37 @@
     if (itemList.hasPointerCapture(pointerId)) itemList.releasePointerCapture(pointerId)
   }
 
+  function clearDropTarget() {
+    drag.target?.panel.classList.remove('drop-group')
+    drag.marker?.classList.remove('drop-before', 'drop-after')
+    drag.target = null
+    drag.before = null
+    drag.marker = null
+  }
+
   function positionDraggedRow() {
-    const { row, itemList, y, grabOffset } = drag
-    const before = [...itemList.children].find(other => {
-      if (other === row) return false
+    const { row, itemList, x, y, grabOffset } = drag
+    clearDropTarget()
+    const bounds = groupContainer.getBoundingClientRect()
+    const rowTop = Math.max(bounds.top, Math.min(y - grabOffset, bounds.bottom - row.offsetHeight))
+    const offset = rowTop - itemList.getBoundingClientRect().top - row.offsetTop
+    row.style.transform = 'translateY(' + offset + 'px)'
+    const target = groups.find(({ panel }) => {
+      if (panel.hidden) return false
+      const rect = panel.getBoundingClientRect()
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+    })
+    if (!target) return
+    const others = [...target.items.children].filter(other => other !== row)
+    const before = others.find(other => {
       const rect = other.getBoundingClientRect()
       return y < rect.top + rect.height / 2
     }) || null
-    if (row.nextElementSibling !== before) itemList.insertBefore(row, before)
-    const top = Math.max(0, Math.min(itemList.clientHeight - row.offsetHeight,
-      y - itemList.getBoundingClientRect().top - grabOffset))
-    row.style.transform = 'translateY(' + (top - row.offsetTop) + 'px)'
+    drag.target = target
+    drag.before = before
+    drag.marker = before || others[others.length - 1]
+    drag.marker?.classList.add(before ? 'drop-before' : 'drop-after')
+    if (target.items !== itemList) target.panel.classList.add('drop-group')
   }
 
   function scrollWhileDragging() {
@@ -213,7 +236,10 @@
     const speed = y < edge ? y - edge : Math.max(0, y - (innerHeight - edge))
     if (!speed) return
     const previous = window.scrollY
-    window.scrollBy(0, Math.sign(speed) * Math.min(18, Math.ceil(Math.abs(speed) / 3)))
+    const bounds = groupContainer.getBoundingClientRect()
+    const remaining = speed < 0 ? -bounds.top : bounds.bottom - innerHeight
+    if (remaining <= 0) return
+    window.scrollBy(0, Math.sign(speed) * Math.min(18, Math.ceil(Math.abs(speed) / 3), Math.ceil(remaining)))
     if (window.scrollY === previous) return
     positionDraggedRow()
     drag.frame = requestAnimationFrame(scrollWhileDragging)
@@ -224,7 +250,7 @@
     if (!handle || busy || drag || !event.isPrimary || event.button !== 0) return
     const row = handle.closest('.item')
     const itemList = row.parentElement
-    drag = { row, itemList, pointerId: event.pointerId, startY: event.clientY, y: event.clientY,
+    drag = { row, itemList, pointerId: event.pointerId, startY: event.clientY, y: event.clientY, x: event.clientX,
       grabOffset: event.clientY - row.getBoundingClientRect().top,
       originalNext: row.nextElementSibling, moving: false, frame: 0 }
     itemList.setPointerCapture(event.pointerId)
@@ -232,6 +258,7 @@
 
   groupContainer.addEventListener('pointermove', event => {
     if (drag?.pointerId !== event.pointerId) return
+    drag.x = event.clientX
     drag.y = event.clientY
     if (!drag.moving && Math.abs(drag.y - drag.startY) < 4) return
     drag.moving = true
@@ -241,22 +268,25 @@
     if (!drag.frame) drag.frame = requestAnimationFrame(scrollWhileDragging)
   })
 
-  async function savePosition(row, before) {
+  async function savePosition(row, before, destination) {
     const id = row.dataset.id
-    const category = row.closest('[data-group]').dataset.group
-    const saved = await save({ type: 'move', category, id, before: before?.dataset.id ?? null })
+    const previousCategory = row.closest('[data-group]').dataset.group
+    const saved = await save({ type: 'move', category: destination ?? previousCategory,
+      previousCategory, id, before: before?.dataset.id ?? null })
     if (!saved) renderItems()
   }
 
   groupContainer.addEventListener('pointerup', event => {
     if (drag?.pointerId !== event.pointerId) return
-    const { row, originalNext, moving } = drag
+    const { row, itemList, originalNext, moving } = drag
     if (moving) {
+      drag.x = event.clientX
       drag.y = event.clientY
       positionDraggedRow()
     }
+    const { target, before } = drag
     clearDrag()
-    if (moving && row.nextElementSibling !== originalNext) savePosition(row, row.nextElementSibling)
+    if (target && (target.items !== itemList || before !== originalNext)) savePosition(row, before, target.kind)
   })
 
   function cancelDrag() {
@@ -302,7 +332,7 @@
       element.disabled = busy
     }
     refreshButton.disabled = busy || refreshing
-    for (const { form, input } of groups) {
+    for (const { form, input } of composers) {
       form.querySelector('button').disabled = busy || !input.value.trim()
     }
   }
@@ -413,25 +443,38 @@
   }
 
   function resetDrafts() {
-    for (const group of groups) {
-      group.draft = null
-      group.input.value = ''
+    for (const composer of composers) {
+      composer.draft = null
+      composer.input.value = ''
     }
+    homeOption.checked = false
+    updateMealPlaceholder()
   }
 
-  for (const group of groups) {
-    const { form, input, kind } = group
+  function updateMealPlaceholder() {
+    const mealComposer = composers.find(composer => composer.kind === 'meals')
+    mealComposer.input.placeholder = copy[homeOption.checked ? 'home' : 'meals'].placeholder
+  }
+  homeOption.addEventListener('change', updateMealPlaceholder)
+
+  for (const composer of composers) {
+    const { form, input, kind } = composer
     input.addEventListener('input', updateControls)
     form.addEventListener('submit', async event => {
       event.preventDefault()
       const text = input.value.trim()
       if (!text || busy) return
-      if (group.draft?.text !== text) {
-        group.draft = { type: 'add', id: newItemId(), category: kind, text }
+      const destination = kind === 'meals' && homeOption.checked ? 'home' : kind
+      if (composer.draft?.text !== text || composer.draft.category !== destination) {
+        composer.draft = { type: 'add', id: newItemId(), category: destination, text }
       }
-      if (await save(group.draft)) {
-        group.draft = null
+      if (await save(composer.draft)) {
+        composer.draft = null
         input.value = ''
+        if (kind === 'meals') {
+          homeOption.checked = false
+          updateMealPlaceholder()
+        }
         updateControls()
         input.focus()
       }
